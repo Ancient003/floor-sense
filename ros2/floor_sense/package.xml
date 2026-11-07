@@ -2,14 +2,16 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>floor_sense</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="ancientone0041@gmail.com">anurag</maintainer>
-  <license>TODO: License declaration</license>
+  <version>0.1.0</version>
+  <description>Floor Sense: serial bridge between the STM32 proprioception module and ROS 2, plus a fake Nucleo for testing without hardware.</description>
+  <maintainer email="ancient003@todo.todo">Ancient003</maintainer>
+  <license>MIT</license>
 
-  <depend>rclpy</depend>
-  <depend>std_msgs</depend>
-  <depend>sensor_msgs</depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>python3-serial</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
