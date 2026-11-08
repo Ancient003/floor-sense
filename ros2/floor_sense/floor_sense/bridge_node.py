@@ -2,12 +2,15 @@
 ROS 2 bridge between the Floor Sense Nucleo and the Pi.
 
 Serial in  -> imu/data_raw, proprio/terrain, proprio/confidence, proprio/vibration,
-              proprio/event
+              proprio/event, proprio/status (heartbeat flags, once a second)
+Diagnostics-> proprio/link (JSON: frame rates and error counts, every stats_period)
 cmd_vel in -> MOTOR frames out, 10 times a second (zeros when cmd_vel goes quiet)
 
     ros2 run floor_sense bridge
     ros2 run floor_sense bridge --ros-args -p port:=/tmp/floorsense_fake
 """
+
+import json
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
@@ -22,6 +25,7 @@ from std_msgs.msg import Float32, String
 from floor_sense import protocol as fs
 
 SILENCE_TIMEOUT = 2.0      # seconds without bytes before the link counts as lost
+DRAIN_TIME = 0.5           # after opening, throw away bytes the ST-LINK stored while closed
 WARN_EVENTS = {'collision', 'stuck', 'lifted', 'slip'}
 
 
@@ -43,6 +47,8 @@ class Bridge(Node):
         self.conf_pub = self.create_publisher(Float32, 'proprio/confidence', 10)
         self.vib_pub = self.create_publisher(Float32, 'proprio/vibration', 10)
         self.event_pub = self.create_publisher(String, 'proprio/event', 10)
+        self.status_pub = self.create_publisher(String, 'proprio/status', 10)
+        self.link_pub = self.create_publisher(String, 'proprio/link', 10)
         self.create_subscription(Twist, 'cmd_vel', self.on_cmd_vel, 10)
 
         self.ser = None
@@ -50,6 +56,8 @@ class Bridge(Node):
         self.waiting_logged = False
         self.open_failed = False
         self.last_rx = None
+        self.drain_until = 0.0
+        self.drained = 0
         self.parser = fs.FrameParser()
         self.seq = fs.SeqTracker()
         self.tx_seq = 0
@@ -93,6 +101,7 @@ class Bridge(Node):
         self.parser = fs.FrameParser()
         self.seq = fs.SeqTracker()
         self.last_rx = self.now_s()
+        self.drain_until = self.last_rx + DRAIN_TIME
         if not self.waiting_logged:
             self.get_logger().info(f'Opened {self.port} at {self.baud} baud, waiting for data')
             self.waiting_logged = True
@@ -126,6 +135,9 @@ class Bridge(Node):
         if not data:
             return
         self.last_rx = self.now_s()
+        if self.last_rx < self.drain_until:     # old frames from before we opened the port
+            self.drained += len(data)
+            return
         if not self.receiving:
             self.receiving = True
             self.waiting_logged = False
@@ -178,6 +190,7 @@ class Bridge(Node):
         self.imu_pub.publish(m)
 
     def on_flags(self, flags):
+        self.status_pub.publish(String(data=','.join(fs.flag_names(flags))))
         if flags == self.flags:
             return
         names = ', '.join(fs.flag_names(flags)) or 'no flags'
@@ -221,15 +234,19 @@ class Bridge(Node):
     # ---- diagnostics ----------------------------------------------------------
 
     def report(self):
-        if not self.receiving:
-            return
-        rates = []
+        rates = {}
         for t, name in fs.MSG_NAMES.items():
             n = self.counts.get(t, 0) - self.prev_counts.get(t, 0)
             if n:
-                rates.append(f'{name} {n / self.stats_period:.1f}/s')
+                rates[name] = round(n / self.stats_period, 1)
         self.prev_counts = dict(self.counts)
         p = self.parser
+        self.link_pub.publish(String(data=json.dumps({
+            'receiving': self.receiving, 'rates': rates, 'crc_errors': p.crc_errors,
+            'lost': self.seq.lost, 'skipped_bytes': p.discarded})))
+        if not self.receiving:
+            return
+        rates = [f'{name} {r:.1f}/s' for name, r in rates.items()]
         terrain = f'{self.last_terrain[0]} {self.last_terrain[1]}%' if self.last_terrain else '-'
         self.get_logger().info(
             f'{", ".join(rates) or "no frames"} | last terrain {terrain} | '

@@ -1,0 +1,1188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Floor Sense</title>
+<style>
+/* Fonts are served by the Pi, so the page works without internet. Both are SIL OFL. */
+@font-face { font-family: "Pirata One"; src: url(/fonts/pirata-one-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url(/fonts/alegreya-sans-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url(/fonts/alegreya-sans-latin-500-normal.woff2) format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Alegreya Sans"; src: url(/fonts/alegreya-sans-latin-700-normal.woff2) format("woff2"); font-weight: 700; font-display: swap; }
+:root {
+  --void: #120E15;
+  --crypt: #1A1520;
+  --vault: #241D2B;
+  --iron: #3B3243;
+  --iron-2: #554A5E;
+  --bone: #EAE0CF;
+  --ash: #A99D93;
+  --gild: #C8A35A;
+  --blood: #A3142E;
+  --verdigris: #5DA596;
+  --ember: #E09B3D;
+  --tile: #4F7BA3;
+  --carpet: #8E2440;
+  --grass: #4C7D2C;
+  --unknown: #4A4152;
+  --sx: #8DB3D9;
+  --sy: #C8A35A;
+  --sz: #C47CA4;
+  --display: "Pirata One", "UnifrakturCook", "Old English Text MT", Georgia, serif;
+  --text: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100vh; color: var(--bone);
+  font: 16px/1.45 var(--text);
+  background:
+    radial-gradient(1200px 700px at 50% -10%, rgba(200,163,90,.07), transparent 60%),
+    radial-gradient(900px 600px at 100% 100%, rgba(142,36,64,.08), transparent 60%),
+    var(--void);
+}
+h1, h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; letter-spacing: .01em; }
+h2 { font-size: 25px; line-height: 1.1; }
+h3 { font-size: 19px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--gild); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.dim { color: var(--ash); }
+.hint { color: var(--ash); font-size: 14.5px; margin: 4px 0 12px; }
+
+/* ---------------- header ---------------- */
+.bar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 14px 24px; flex-wrap: wrap;
+  padding: 10px 22px;
+  background: rgba(18,14,21,.97);
+  border-bottom: 1px solid var(--iron);
+}
+.brand { font-size: 34px; line-height: 1; color: var(--bone); }
+.brand span { color: var(--gild); }
+.tabs { display: flex; gap: 4px; }
+.tabs button {
+  background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px; cursor: pointer;
+  color: var(--ash); font-weight: 500;
+}
+.tabs button[aria-selected="true"] { color: var(--bone); border-bottom-color: var(--gild); }
+.status { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; padding: 0; flex: 1; justify-content: flex-end; }
+.chip { display: inline-flex; align-items: center; gap: 7px; font-size: 14.5px; color: var(--ash); white-space: nowrap; }
+.chip i { width: 8px; height: 8px; transform: rotate(45deg); background: var(--iron-2); flex: none; }
+.chip[data-state="ok"] i { background: var(--verdigris); box-shadow: 0 0 8px rgba(93,165,150,.6); }
+.chip[data-state="warn"] i { background: var(--ember); }
+.chip[data-state="bad"] i { background: var(--blood); box-shadow: 0 0 8px rgba(163,20,46,.8); }
+.chip[data-state="bad"] { color: #F0A0AE; font-weight: 500; }
+.estop {
+  font: 700 17px var(--text); letter-spacing: .04em; color: #fff;
+  background: radial-gradient(circle at 50% 35%, #C51B38, var(--blood) 60%, #6E0C1E);
+  border: 3px solid var(--gild); border-radius: 999px;
+  padding: 9px 30px; cursor: pointer;
+  box-shadow: 0 0 0 3px var(--void), 0 0 18px rgba(163,20,46,.55);
+}
+.estop:active { transform: translateY(1px); }
+.banner { background: var(--blood); color: #fff; padding: 8px 22px; font-weight: 500; }
+
+/* ---------------- layout ---------------- */
+main { max-width: 1560px; margin: 0 auto; padding: 18px 22px 40px; }
+.live { display: grid; grid-template-columns: 300px minmax(0, 1fr) 350px; gap: 18px; align-items: start; }
+.col { display: grid; gap: 18px; align-content: start; min-width: 0; }
+.panel {
+  position: relative; background: linear-gradient(180deg, var(--crypt), #171219);
+  border: 1px solid var(--iron); border-radius: 3px; padding: 16px 18px 18px;
+}
+.panel::before {           /* gilded hairline under the title: the only ornament on panels */
+  content: ""; position: absolute; left: 18px; right: 18px; top: 50px; height: 1px;
+  background: linear-gradient(90deg, var(--gild), rgba(200,163,90,.15) 60%, transparent);
+  opacity: .55;
+}
+.panel > h2 { margin-bottom: 18px; min-height: 26px; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 18px; min-height: 26px; }
+.panel-head h2 { margin: 0; }
+.panel-head .meta { font-size: 14px; color: var(--ash); }
+
+/* ---------------- surface: the stained-glass lancet ---------------- */
+.lancet-wrap { display: grid; justify-items: center; gap: 12px; }
+.lancet { width: 100%; max-width: 250px; height: auto; display: block; }
+.lancet .glass { transition: fill .6s ease; }
+.lancet .name { font-family: var(--display); fill: #FFF6E6; paint-order: stroke; stroke: rgba(10,6,12,.85); stroke-width: 6px; }
+.lancet .oculus-text { font-family: var(--text); font-weight: 700; fill: #FFF6E6; font-size: 22px; }
+.lancet .oculus-sub { font-family: var(--text); fill: #FFF6E6; font-size: 11px; opacity: .85; }
+.votes { display: flex; gap: 6px; }
+.votes span {
+  width: 30px; height: 30px; display: grid; place-items: center; font: 700 14px var(--text);
+  border: 1px solid var(--iron-2); color: var(--ash); background: var(--vault);
+}
+.votes span.match { color: #fff; border-color: var(--gild); }
+.surf-note { text-align: center; color: var(--ash); font-size: 14.5px; margin: 0; max-width: 34ch; }
+
+/* ---------------- attitude: the rose window ---------------- */
+.rose { width: 100%; max-width: 250px; display: block; margin: 0 auto; }
+.readouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; text-align: center; }
+.readouts b { display: block; font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.readouts span { font-size: 13px; color: var(--ash); }
+
+/* ---------------- charts ---------------- */
+canvas { display: block; width: 100%; }
+.plot { position: relative; }
+.plot canvas { background: #100C12; border: 1px solid var(--iron); border-radius: 2px; }
+.plot + .plot { margin-top: 16px; }
+.plot-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.plot-head h3 { font-family: var(--text); font-size: 15px; font-weight: 500; color: var(--bone); }
+.legend { display: flex; gap: 14px; font-size: 14px; color: var(--ash); }
+.legend b { font-weight: 500; font-variant-numeric: tabular-nums; }
+.legend .x b { color: var(--sx); } .legend .y b { color: var(--sy); } .legend .z b { color: var(--sz); }
+#seis { height: 110px; } #spec { height: 150px; } #acc, #gyr { height: 140px; } #timeline { height: 64px; }
+.empty {
+  position: absolute; inset: 26px 0 0; display: grid; place-items: center; text-align: center;
+  padding: 16px; color: var(--ash); font-size: 14.5px; background: rgba(16,12,18,.82);
+}
+
+/* ---------------- events ---------------- */
+.event-list { list-style: none; margin: 12px 0 0; padding: 0; max-height: 170px; overflow: auto; }
+.event-list li { display: flex; gap: 14px; padding: 6px 0; border-top: 1px solid var(--iron); font-size: 15px; }
+.event-list li:first-child { border-top: 0; }
+.event-list time { color: var(--ash); font-variant-numeric: tabular-nums; }
+.event-list li.serious { color: #F0A0AE; }
+
+/* ---------------- health ---------------- */
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; font-size: 15px; }
+.kv dt { color: var(--ash); }
+.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.kv dd.warn { color: var(--ember); } .kv dd.bad { color: #F0A0AE; } .kv dd.ok { color: var(--verdigris); }
+.kv-group + .kv-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--iron); }
+.kv-group h3 { font-family: var(--text); font-size: 14px; font-weight: 700; color: var(--gild); margin-bottom: 6px; }
+
+/* ---------------- drive ---------------- */
+.stick {
+  position: relative; width: 196px; height: 196px; margin: 4px auto 14px; border-radius: 50%;
+  background: radial-gradient(circle, var(--vault) 0 60%, #1C1622 61% 100%);
+  border: 1px solid var(--iron-2); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+}
+.stick::before, .stick::after { content: ""; position: absolute; background: var(--iron); }
+.stick::before { left: 50%; top: 14px; bottom: 14px; width: 1px; }
+.stick::after { top: 50%; left: 14px; right: 14px; height: 1px; }
+.knob {
+  position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #E3C98F, var(--gild) 45%, #7D6430);
+  box-shadow: 0 4px 14px rgba(0,0,0,.6); z-index: 1; pointer-events: none;
+}
+.stick.active { cursor: grabbing; border-color: var(--gild); }
+.stick-label { position: absolute; left: 0; right: 0; bottom: -26px; text-align: center; font-size: 13.5px; color: var(--ash); }
+.field { display: grid; gap: 6px; margin: 14px 0; }
+.field-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.field-row output { font-variant-numeric: tabular-nums; font-weight: 500; color: var(--gild); }
+input[type="range"] { width: 100%; accent-color: var(--gild); }
+.keys { font-size: 13.5px; color: var(--ash); margin: 4px 0 0; }
+kbd { font: inherit; border: 1px solid var(--iron-2); border-bottom-width: 2px; padding: 0 5px; border-radius: 3px; color: var(--bone); }
+
+/* ---------------- record ---------------- */
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.seg button { padding: 8px 4px; border: 1px solid var(--iron-2); background: var(--vault); cursor: pointer; border-radius: 2px; }
+.seg button[aria-pressed="true"] { color: #fff; border-color: var(--gild); }
+.seg button[data-s="tile"][aria-pressed="true"] { background: var(--tile); }
+.seg button[data-s="carpet"][aria-pressed="true"] { background: var(--carpet); }
+.seg button[data-s="grass"][aria-pressed="true"] { background: var(--grass); }
+.seg button[data-s="other"][aria-pressed="true"] { background: var(--unknown); }
+.text-in, .num-in, select {
+  padding: 8px 10px; border: 1px solid var(--iron-2); background: var(--vault); border-radius: 2px;
+}
+.text-in { width: 100%; }
+.num-in { width: 92px; text-align: right; }
+.check { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0; }
+.check input { width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--gild); }
+.plan { font-size: 14.5px; color: var(--ash); margin: 0 0 12px; }
+.btn {
+  width: 100%; padding: 11px 14px; border: 1px solid var(--gild); border-radius: 2px; cursor: pointer;
+  background: linear-gradient(180deg, #2F2636, #241D2B); color: var(--bone); font-weight: 700; letter-spacing: .02em;
+}
+.btn:hover:not(:disabled) { background: linear-gradient(180deg, #3A2F42, #2B2333); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.recording { background: var(--blood); border-color: #E04A64; color: #fff; }
+.btn.small { width: auto; padding: 5px 10px; font-weight: 500; font-size: 14px; }
+.why { font-size: 14px; color: var(--ember); margin: 8px 0 0; min-height: 1em; }
+.progress { height: 4px; background: var(--iron); margin: 12px 0 6px; overflow: hidden; }
+.progress span { display: block; height: 100%; width: 0; background: var(--blood); box-shadow: 0 0 10px var(--blood); }
+.rec-line, .result { font-size: 14.5px; margin: 0; }
+.result { margin-top: 10px; }
+.result.partial { color: var(--ember); }
+
+/* ---------------- data tab ---------------- */
+.data { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.coverage { width: 100%; border-collapse: collapse; font-size: 15px; }
+.coverage th { font-weight: 500; color: var(--ash); text-align: center; padding: 6px 4px; }
+.coverage th:first-child { text-align: left; }
+.coverage td { padding: 3px; }
+.coverage td button {
+  width: 100%; min-height: 44px; border: 1px solid var(--iron); cursor: pointer; border-radius: 2px;
+  background: var(--vault); color: var(--bone); font-variant-numeric: tabular-nums; position: relative; overflow: hidden;
+}
+.coverage td button .fill { position: absolute; left: 0; bottom: 0; top: 0; background: var(--c, var(--gild)); opacity: .55; }
+.coverage td button .lbl { position: relative; }
+.coverage td button[aria-pressed="true"] { outline: 2px solid var(--gild); }
+.coverage .rowname { display: flex; align-items: center; gap: 8px; }
+.coverage .rowname i { width: 10px; height: 10px; transform: rotate(45deg); }
+.lib { list-style: none; margin: 0; padding: 0; }
+.lib li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--iron); }
+.lib li.sel { background: linear-gradient(90deg, rgba(200,163,90,.1), transparent); }
+.lib .fname { font-weight: 500; word-break: break-all; }
+.lib .meta { grid-column: 1; font-size: 14px; color: var(--ash); }
+.lib .meta.partial { color: var(--ember); }
+.lib .acts { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 6px; align-items: center; }
+.lib a { color: var(--gild); font-size: 14px; }
+.danger { border-color: #7E2A3A !important; }
+.danger.armed { background: var(--blood) !important; color: #fff; }
+.filterbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14.5px; color: var(--ash); margin-bottom: 6px; }
+.stats { width: 100%; border-collapse: collapse; font-size: 14.5px; margin: 10px 0 14px; font-variant-numeric: tabular-nums; }
+.stats th, .stats td { padding: 5px 6px; text-align: right; border-bottom: 1px solid var(--iron); }
+.stats th:first-child, .stats td:first-child { text-align: left; }
+.stats th { color: var(--ash); font-weight: 500; }
+#insTrace { height: 120px; } #insSpec { height: 140px; }
+.radio { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.radio label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.radio input { accent-color: var(--gild); }
+.export-sum { font-size: 14.5px; margin: 12px 0; }
+.export-sum ul { list-style: none; padding: 0; margin: 6px 0; }
+.export-sum li { display: flex; justify-content: space-between; border-top: 1px solid var(--iron); padding: 4px 0; }
+.warn-text { color: var(--ember); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: min(92vw, 540px);
+  background: var(--vault); border: 1px solid var(--gild); color: var(--bone); padding: 10px 16px; z-index: 30; font-size: 15px;
+}
+.toast:empty { display: none; }
+
+@media (max-width: 1180px) {
+  .live { display: flex; flex-direction: column; align-items: stretch; }
+  .col { display: contents; }
+  #pSurface { order: 1; } #pDrive { order: 2; } #pVib { order: 3; } #pRose { order: 4; }
+  #pMotion { order: 5; } #pTimeline { order: 6; } #pRecord { order: 7; } #pHealth { order: 8; }
+  .data { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .bar { padding: 8px 12px; gap: 6px 14px; }
+  .brand { font-size: 28px; }
+  .status { order: 4; flex-basis: 100%; justify-content: flex-start; gap: 3px 14px; }
+  .chip { font-size: 13.5px; }
+  main { padding: 12px 12px 100px; }
+  .estop { position: fixed; left: 12px; right: 12px; bottom: 12px; padding: 14px; font-size: 20px; z-index: 20; }
+  .toast { bottom: 94px; }
+}
+@media (prefers-reduced-motion: reduce) { .lancet .glass { transition: none; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <h1 class="brand">Floor <span>Sense</span></h1>
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button role="tab" id="tabLive" aria-selected="true" aria-controls="live">Live</button>
+    <button role="tab" id="tabData" aria-selected="false" aria-controls="data">Data</button>
+  </nav>
+  <ul class="status" aria-label="Robot status">
+    <li class="chip" id="stNucleo" data-state="off"><i></i><span>Connecting to the Pi</span></li>
+    <li class="chip" id="stSensor" data-state="off"><i></i><span>Sensor</span></li>
+    <li class="chip" id="stMotors" data-state="off"><i></i><span>Motors</span></li>
+    <li class="chip" id="stModel" data-state="off"><i></i><span>Classifier</span></li>
+  </ul>
+  <button class="estop" id="stop" title="Stop the wheels (Space)">Stop</button>
+</header>
+<div class="banner" id="offline" role="alert" hidden>Lost the connection to the Pi. Retrying.</div>
+
+<main>
+<!-- ======================= LIVE ======================= -->
+<section class="live" id="live" role="tabpanel" aria-labelledby="tabLive">
+  <div class="col">
+    <section class="panel" id="pSurface" aria-labelledby="hSurface">
+      <h2 id="hSurface">Surface</h2>
+      <div class="lancet-wrap">
+        <svg class="lancet" viewBox="0 0 240 330" role="img" aria-labelledby="surfTitle">
+          <title id="surfTitle">Surface under the wheels</title>
+          <defs>
+            <pattern id="pat-tile" width="30" height="30" patternUnits="userSpaceOnUse">
+              <path d="M30 0H0V30" fill="none" stroke="rgba(8,5,10,.75)" stroke-width="2.5"/>
+              <path d="M4 4h10" stroke="rgba(255,255,255,.18)" stroke-width="2"/>
+            </pattern>
+            <pattern id="pat-carpet" width="16" height="16" patternUnits="userSpaceOnUse">
+              <path d="M8 0 16 8 8 16 0 8z" fill="none" stroke="rgba(8,5,10,.7)" stroke-width="1.6"/>
+              <circle cx="8" cy="8" r="1.4" fill="rgba(255,255,255,.22)"/>
+            </pattern>
+            <pattern id="pat-grass" width="12" height="22" patternUnits="userSpaceOnUse">
+              <path d="M2 22 Q3 11 1 2M7 22 Q8 13 10 5" fill="none" stroke="rgba(8,5,10,.6)" stroke-width="1.6"/>
+              <path d="M4.5 22 Q5 15 6 9" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="1.2"/>
+            </pattern>
+            <pattern id="pat-unknown" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <path d="M0 0V14" stroke="rgba(8,5,10,.5)" stroke-width="2"/>
+            </pattern>
+            <radialGradient id="glow" cx="50%" cy="38%" r="70%">
+              <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
+              <stop offset=".6" stop-color="#fff" stop-opacity="0"/>
+              <stop offset="1" stop-color="#000" stop-opacity=".45"/>
+            </radialGradient>
+            <clipPath id="arch"><path d="M10 322V128A228 228 0 0 1 120 10A228 228 0 0 1 230 128V322Z"/></clipPath>
+          </defs>
+          <g clip-path="url(#arch)">
+            <rect class="glass" id="glassColor" width="240" height="330" fill="var(--unknown)"/>
+            <rect id="glassPattern" width="240" height="330" fill="url(#pat-unknown)"/>
+            <rect width="240" height="330" fill="url(#glow)"/>
+            <!-- tracery: oculus in the head, transom below it -->
+            <circle cx="120" cy="98" r="40" fill="rgba(8,5,10,.55)" stroke="#120E15" stroke-width="5"/>
+            <path d="M10 160H230" stroke="#120E15" stroke-width="5"/>
+          </g>
+          <path d="M10 322V128A228 228 0 0 1 120 10A228 228 0 0 1 230 128V322Z" fill="none" stroke="#3B3243" stroke-width="9"/>
+          <path d="M10 322V128A228 228 0 0 1 120 10A228 228 0 0 1 230 128V322Z" fill="none" stroke="var(--gild)" stroke-width="1.2" opacity=".8"/>
+          <text class="oculus-text num" id="confText" x="120" y="104" text-anchor="middle">–</text>
+          <text class="oculus-sub" id="confSub" x="120" y="121" text-anchor="middle">sure</text>
+          <text class="name" id="surfName" x="120" y="252" text-anchor="middle" font-size="56">Waiting</text>
+        </svg>
+        <div class="votes" id="votes" aria-label="Last five classifier windows"></div>
+        <p class="surf-note" id="surfNote">The surface appears here once the NanoEdge model runs on the Nucleo.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="pRose" aria-labelledby="hRose">
+      <div class="panel-head"><h2 id="hRose">Attitude</h2><span class="meta" id="motionState">–</span></div>
+      <svg class="rose" viewBox="-110 -110 220 220" role="img" aria-label="Roll and pitch of the robot">
+        <defs><clipPath id="disc"><circle r="78"/></clipPath></defs>
+        <g clip-path="url(#disc)">
+          <g id="horizon">
+            <rect x="-200" y="-400" width="400" height="400" fill="#1F1D3A"/>
+            <rect x="-200" y="0" width="400" height="400" fill="#3A1C27"/>
+            <g id="ladder" stroke="rgba(234,224,207,.5)" stroke-width="1"></g>
+            <line x1="-200" x2="200" y1="0" y2="0" stroke="var(--gild)" stroke-width="2"/>
+          </g>
+        </g>
+        <circle r="78" fill="none" stroke="#120E15" stroke-width="6"/>
+        <circle r="92" fill="none" stroke="var(--iron)" stroke-width="10"/>
+        <g id="ticks" stroke="var(--iron-2)" stroke-width="1.5"></g>
+        <g id="foils" fill="none" stroke="var(--iron-2)" stroke-width="1.2"></g>
+        <g id="rollPointer"><path d="M0 -84 -6 -96H6Z" fill="var(--gild)"/></g>
+        <path d="M-34 0H-12L0 9 12 0H34" fill="none" stroke="var(--gild)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle r="2.5" fill="var(--gild)"/>
+      </svg>
+      <div class="readouts">
+        <div><b id="rollOut">–</b><span>Roll</span></div>
+        <div><b id="pitchOut">–</b><span>Pitch</span></div>
+        <div><b id="gOut">–</b><span>Total g</span></div>
+      </div>
+      <p class="hint" style="margin-top:12px">From accelerometer and gyro. The MPU6500 has no compass, so there is no heading.</p>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel" id="pVib" aria-labelledby="hVib">
+      <div class="panel-head"><h2 id="hVib">Vibration</h2><span class="meta num" id="vibMeta"></span></div>
+      <div class="plot">
+        <div class="plot-head"><h3>Total acceleration minus 1 g, last 10 s</h3><span class="legend num" id="vibText"></span></div>
+        <canvas id="seis" aria-label="Vibration trace"></canvas>
+        <div class="empty" data-needs-imu>No sensor data yet.</div>
+      </div>
+      <div class="plot">
+        <div class="plot-head"><h3>Spectrogram, 0 to <span id="nyq">50</span> Hz</h3><span class="legend num" id="domFreq"></span></div>
+        <canvas id="spec" aria-label="Frequency content of the vibration over the last 10 seconds"></canvas>
+        <div class="empty" data-needs-imu>The frequency picture appears once samples arrive.</div>
+      </div>
+    </section>
+
+    <section class="panel" id="pMotion" aria-labelledby="hMotion">
+      <h2 id="hMotion">Motion sensor</h2>
+      <div class="plot">
+        <div class="plot-head"><h3>Acceleration, g</h3>
+          <div class="legend" id="accLegend"><span class="x">x <b></b></span><span class="y">y <b></b></span><span class="z">z <b></b></span></div></div>
+        <canvas id="acc" aria-label="Acceleration on three axes"></canvas>
+        <div class="empty" data-needs-imu>No sensor data yet. Check the MPU wiring and the firmware.</div>
+      </div>
+      <div class="plot">
+        <div class="plot-head"><h3>Rotation, °/s</h3>
+          <div class="legend" id="gyrLegend"><span class="x">x <b></b></span><span class="y">y <b></b></span><span class="z">z <b></b></span></div></div>
+        <canvas id="gyr" aria-label="Rotation rate on three axes"></canvas>
+      </div>
+    </section>
+
+    <section class="panel" id="pTimeline" aria-labelledby="hTimeline">
+      <div class="panel-head"><h2 id="hTimeline">Timeline</h2><span class="meta">last 2 minutes</span></div>
+      <canvas id="timeline" aria-label="Detected surface and events over the last two minutes"></canvas>
+      <ul class="event-list" id="events" aria-live="polite"></ul>
+      <p class="hint" id="eventsEmpty">No events yet. Collisions, lifts and stuck wheels appear here and on the timeline.</p>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel" id="pDrive" aria-labelledby="hDrive">
+      <div class="panel-head"><h2 id="hDrive">Drive</h2><span class="meta" id="hub">Ready</span></div>
+      <div class="stick" id="stick" aria-label="Drive stick. Drag to drive, let go to stop.">
+        <div class="knob" id="knob"></div>
+        <span class="stick-label">Drag to drive. Let go to stop.</span>
+      </div>
+      <label class="field" for="spd" style="margin-top:34px">
+        <span class="field-row">Top speed <output id="spdOut" for="spd"></output></span>
+        <input type="range" id="spd" min="10" max="100" step="10" value="40">
+      </label>
+      <p class="keys">Keys: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to drive, <kbd>Space</kbd> to stop.</p>
+    </section>
+
+    <section class="panel" id="pRecord" aria-labelledby="hRecord">
+      <h2 id="hRecord">Record</h2>
+      <div class="field">
+        <span class="field-row">Surface</span>
+        <div class="seg" id="surfSeg" role="group" aria-label="Surface">
+          <button data-s="tile" aria-pressed="true">Tile</button>
+          <button data-s="carpet" aria-pressed="false">Carpet</button>
+          <button data-s="grass" aria-pressed="false">Grass</button>
+          <button data-s="other" aria-pressed="false">Other</button>
+        </div>
+        <input class="text-in" id="otherName" placeholder="Name, e.g. wood or concrete" maxlength="24" hidden>
+      </div>
+      <label class="field" for="pwr">
+        <span class="field-row">Motor power <output id="pwrOut" for="pwr"></output></span>
+        <input type="range" id="pwr" min="10" max="100" step="10" value="60">
+      </label>
+      <label class="field-row field" for="dur">Duration, seconds <input class="num-in num" id="dur" type="number" min="2" max="60" step="1" value="10"></label>
+      <label class="check"><input type="checkbox" id="driveRec" checked><span>Drive straight while recording</span></label>
+      <p class="plan" id="plan"></p>
+      <button class="btn" id="recBtn">Start recording</button>
+      <p class="why" id="recWhy"></p>
+      <div id="recLive" hidden>
+        <div class="progress" aria-hidden="true"><span id="recFill"></span></div>
+        <p class="rec-line" id="recLine" aria-live="polite"></p>
+      </div>
+      <p class="result" id="recResult" aria-live="polite" hidden></p>
+    </section>
+
+    <section class="panel" id="pHealth" aria-labelledby="hHealth">
+      <h2 id="hHealth">Health</h2>
+      <div class="kv-group"><h3>Serial link</h3>
+        <dl class="kv">
+          <dt>IMU frames</dt><dd id="hImu">–</dd>
+          <dt>Heartbeats</dt><dd id="hHb">–</dd>
+          <dt>Checksum errors</dt><dd id="hCrc">–</dd>
+          <dt>Lost frames</dt><dd id="hLost">–</dd>
+        </dl>
+      </div>
+      <div class="kv-group"><h3>Sensor</h3>
+        <dl class="kv">
+          <dt>Gyro offset x, y, z</dt><dd id="hBias">–</dd>
+          <dt>Noise at rest</dt><dd id="hNoise">–</dd>
+        </dl>
+      </div>
+      <div class="kv-group"><h3>Raspberry Pi</h3>
+        <dl class="kv">
+          <dt>CPU temperature</dt><dd id="hTemp">–</dd>
+          <dt>CPU load</dt><dd id="hLoad">–</dd>
+          <dt>Memory used</dt><dd id="hMem">–</dd>
+          <dt>Free disk</dt><dd id="hDisk">–</dd>
+        </dl>
+      </div>
+    </section>
+  </div>
+</section>
+
+<!-- ======================= DATA ======================= -->
+<section class="data" id="data" role="tabpanel" aria-labelledby="tabData" hidden>
+  <div class="col">
+    <section class="panel" aria-labelledby="hCov">
+      <div class="panel-head"><h2 id="hCov">Coverage</h2>
+        <label class="meta">Goal per cell <input class="num-in num" id="goal" type="number" min="10" max="600" step="10" value="60"> s</label></div>
+      <p class="hint">Seconds of finished recordings for each surface and motor power. Fill every cell so the model learns the surface, not the speed. Select a cell to filter the list.</p>
+      <table class="coverage" id="coverage"></table>
+    </section>
+
+    <section class="panel" aria-labelledby="hLib">
+      <h2 id="hLib">Recordings</h2>
+      <div class="filterbar"><span id="libCount"></span><button class="btn small" id="clearFilter" hidden>Show all</button></div>
+      <ul class="lib" id="lib"></ul>
+      <p class="hint" id="libFolder"></p>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel" aria-labelledby="hIns">
+      <div class="panel-head"><h2 id="hIns">Inspect</h2><span class="meta" id="insName"></span></div>
+      <p class="hint" id="insEmpty">Select Inspect on a recording to check it before training.</p>
+      <div id="insBody" hidden>
+        <table class="stats" id="insStats"></table>
+        <p class="hint" id="insVerdict"></p>
+        <div class="plot"><div class="plot-head"><h3>Total acceleration minus 1 g, whole run</h3></div><canvas id="insTrace"></canvas></div>
+        <div class="plot"><div class="plot-head"><h3>Average spectrum</h3><span class="legend num" id="insDom"></span></div><canvas id="insSpec"></canvas></div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="hExp">
+      <h2 id="hExp">Export for NanoEdge</h2>
+      <p class="hint">Cuts every finished recording into equal windows, one CSV per surface, one window per line. Import each file as one class in NanoEdge AI Studio.</p>
+      <div class="field"><span class="field-row">Window length, samples
+        <select id="expWin"><option>64</option><option>128</option><option selected>256</option><option>512</option><option>1024</option></select></span></div>
+      <div class="field"><span>Signals</span>
+        <div class="radio" id="expAxes">
+          <label><input type="radio" name="axes" value="acc" checked> Accel x, y, z</label>
+          <label><input type="radio" name="axes" value="accz"> Accel z only</label>
+          <label><input type="radio" name="axes" value="all"> Accel and gyro</label>
+        </div></div>
+      <div class="field"><span>Overlap between windows</span>
+        <div class="radio" id="expHop">
+          <label><input type="radio" name="hop" value="1" checked> None</label>
+          <label><input type="radio" name="hop" value="0.5"> Half</label>
+          <label><input type="radio" name="hop" value="0.25"> Three quarters</label>
+        </div></div>
+      <label class="check"><input type="checkbox" id="expPartial"><span>Include runs that stopped early</span></label>
+      <div class="export-sum" id="expSum" aria-live="polite"></div>
+      <button class="btn" id="expBtn">Download NanoEdge files</button>
+    </section>
+  </div>
+</section>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const WINDOW_S = 10, FFT_N = 64;
+  const NAMES = { tile: 'Tile', carpet: 'Carpet', grass: 'Grass', unknown: 'Unknown' };
+  const EVENT_TEXT = {
+    collision: 'Collision. Wheels stopped.', lifted: 'Robot lifted. Wheels stopped.',
+    stuck: 'Wheels stuck. Wheels stopped.', slip: 'Wheel slip.', anomaly: 'Unusual vibration.'
+  };
+  const SERIOUS = new Set(['collision', 'lifted', 'stuck']);
+  const S = {
+    imu: [], lastT: 0, data: null, filesVersion: -1, files: [], surface: 'tile', dirty: true,
+    att: { roll: 0, pitch: 0, t: 0, init: false }, bias: [0, 0, 0], biasSeen: false, noise: null,
+    spec: [], lastSpecT: 0, history: [], marks: [], filter: null
+  };
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  const surfColor = (s) => NAMES[s] && s !== 'unknown' ? css('--' + s) : css('--unknown');
+  const fmt = (v, d) => (v == null || Number.isNaN(v)) ? '–' : v.toFixed(d).replace('-', '−');
+
+  // ---------- small helpers ----------
+  let toastTimer = 0, lastToast = '', lastToastAt = 0;
+  function toast(msg) {
+    const now = Date.now();
+    if (msg === lastToast && now - lastToastAt < 2500) return;
+    lastToast = msg; lastToastAt = now;
+    $('toast').textContent = msg;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { $('toast').textContent = ''; }, 4500);
+  }
+  async function post(url, body) {
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) toast(j.error || 'The Pi refused the request.');
+      return r.ok;
+    } catch (e) { toast('The Pi did not answer. Check that the dashboard is running.'); return false; }
+  }
+  function setChip(id, state, text) { const el = $(id); el.dataset.state = state; el.querySelector('span').textContent = text; }
+  function setKV(id, text, cls) { const el = $(id); el.textContent = text; el.className = cls || ''; }
+
+  // ---------- FFT (radix 2, in place) ----------
+  function fft(re, im) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+      for (let i = 0; i < n; i += len) {
+        let cr = 1, ci = 0;
+        for (let k = 0; k < len / 2; k++) {
+          const a = i + k, b = a + len / 2;
+          const tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+          re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+          const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+        }
+      }
+    }
+  }
+  const HANN = Array.from({ length: FFT_N }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (FFT_N - 1)));
+  function spectrum(values) {          // values.length === FFT_N; returns power per bin 1..N/2
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const re = values.map((v, i) => (v - mean) * HANN[i]), im = new Array(FFT_N).fill(0);
+    fft(re, im);
+    const out = [];
+    for (let k = 1; k <= FFT_N / 2; k++) out.push(re[k] * re[k] + im[k] * im[k]);
+    return out;
+  }
+  const mag = (r) => Math.hypot(r[1], r[2], r[3]);
+
+  // ---------- colour map for spectrograms: crypt -> plum -> ruby -> ember -> bone ----------
+  const STOPS = [[0, [16, 12, 18]], [0.3, [59, 26, 58]], [0.55, [142, 36, 64]], [0.8, [224, 155, 61]], [1, [243, 230, 200]]];
+  const LUT = Array.from({ length: 256 }, (_, i) => {
+    const t = i / 255;
+    let k = 0; while (k < STOPS.length - 2 && t > STOPS[k + 1][0]) k++;
+    const [t0, c0] = STOPS[k], [t1, c1] = STOPS[k + 1], f = (t - t0) / (t1 - t0);
+    return c0.map((c, j) => Math.round(c + (c1[j] - c) * f));
+  });
+
+  // ---------- live data ----------
+  function connect() {
+    const es = new EventSource('/api/stream');
+    es.onopen = () => { S.imu = []; S.lastT = 0; S.spec = []; $('events').textContent = ''; $('eventsEmpty').hidden = false; };
+    es.onmessage = (e) => { $('offline').hidden = true; update(JSON.parse(e.data)); };
+    es.onerror = () => { $('offline').hidden = false; };
+  }
+
+  function update(d) {
+    S.data = d;
+    for (const row of d.imu) {
+      if (row[0] > S.lastT) { S.imu.push(row); S.lastT = row[0]; attitudeStep(row); }
+    }
+    if (S.imu.length > 1700) S.imu.splice(0, S.imu.length - 1500);
+    analyse();
+    status(d); surface(d); events(d.events); record(d); health(d);
+    if (d.files_version !== S.filesVersion) { S.filesVersion = d.files_version; loadFiles(); }
+    S.dirty = true;
+  }
+
+  // complementary filter for roll and pitch, with gyro offset learned while still
+  const wrap = (a) => ((a + 540) % 360) - 180;
+  function attitudeStep(r) {
+    const [t, ax, ay, az, gx, gy] = r;
+    const rollA = Math.atan2(ay, az) * 180 / Math.PI;
+    const pitchA = Math.atan2(-ax, Math.hypot(ay, az)) * 180 / Math.PI;
+    const A = S.att;
+    if (!A.init) { A.roll = rollA; A.pitch = pitchA; A.t = t; A.init = true; return; }
+    const dt = Math.min(Math.max(t - A.t, 0), 0.05); A.t = t;
+    A.roll = wrap(A.roll + (gx - S.bias[0]) * dt); A.pitch = wrap(A.pitch + (gy - S.bias[1]) * dt);
+    A.roll = wrap(A.roll + 0.02 * wrap(rollA - A.roll)); A.pitch = wrap(A.pitch + 0.02 * wrap(pitchA - A.pitch));
+  }
+  function analyse() {
+    const n = S.imu.length; if (n < 20) return;
+    const last = S.imu.slice(-100);
+    const m = last.map(mag), mean = m.reduce((a, b) => a + b, 0) / m.length;
+    const sd = Math.sqrt(m.reduce((a, b) => a + (b - mean) ** 2, 0) / m.length);
+    S.vibSd = sd; S.gTotal = mean;
+    S.motion = sd < 0.008 ? 'Still' : sd < 0.05 ? 'Moving gently' : 'Rough';
+    if (last.length >= 100 && sd < 0.008) {               // learn the gyro offset while still
+      const g = [4, 5, 6].map((c) => last.reduce((a, r) => a + r[c], 0) / last.length);
+      const spread = Math.max(...[4, 5, 6].map((c, i) => Math.max(...last.map((r) => Math.abs(r[c] - g[i])))));
+      if (spread < 2) {
+        S.bias = S.biasSeen ? S.bias.map((b, i) => 0.9 * b + 0.1 * g[i]) : g;
+        S.biasSeen = true; S.noise = sd;
+      }
+    }
+    // one spectrogram column each time about a tenth of a second of new data has arrived
+    if (n >= FFT_N && S.lastT - S.lastSpecT >= 0.1) {
+      S.lastSpecT = S.lastT;
+      S.spec.push({ t: S.lastT, p: spectrum(S.imu.slice(-FFT_N).map(mag)) });
+      while (S.spec.length && S.spec[0].t < S.lastT - WINDOW_S) S.spec.shift();
+    }
+  }
+
+  function status(d) {
+    const f = new Set(d.flags);
+    if (!d.nucleo) {
+      setChip('stNucleo', 'bad', 'Nucleo not connected'); setChip('stSensor', 'off', 'Sensor unknown');
+      setChip('stMotors', 'off', 'Motors unknown'); setChip('stModel', 'off', 'Classifier unknown');
+    } else {
+      setChip('stNucleo', 'ok', 'Nucleo connected');
+      if (d.imu_rate > 5) setChip('stSensor', 'ok', `Sensor ${Math.round(d.imu_rate)} Hz`);
+      else if (f.has('imu_ok')) setChip('stSensor', 'warn', 'Sensor on, no data reaching the Pi');
+      else setChip('stSensor', 'warn', 'No sensor');
+      if (f.has('safety_stop')) setChip('stMotors', 'bad', 'Safety stop: press Stop to clear');
+      else if (d.driving) setChip('stMotors', 'ok', 'Driving');
+      else if (f.has('motors_armed')) setChip('stMotors', 'ok', 'Motors ready');
+      else setChip('stMotors', 'off', 'Motors idle');
+      setChip('stModel', f.has('model_ok') ? 'ok' : 'off', f.has('model_ok') ? 'Classifier running' : 'No classifier yet');
+    }
+    $('hub').textContent = d.driving ? 'Driving' : (f.has('safety_stop') ? 'Stopped' : 'Ready');
+    $('motionState').textContent = S.imu.length > 20 && d.imu_rate > 5 ? S.motion : '–';
+  }
+
+  function surface(d) {
+    const name = d.nucleo ? d.terrain : null;
+    const key = name && NAMES[name] ? name : 'unknown';
+    $('glassColor').setAttribute('fill', surfColor(key));
+    $('glassPattern').setAttribute('fill', `url(#pat-${key})`);
+    const label = name ? (NAMES[name] || cap(name)) : 'Waiting';
+    const el = $('surfName');
+    el.textContent = label;
+    el.setAttribute('font-size', String(Math.min(60, Math.floor(380 / Math.max(label.length, 4)))));
+    if (name) {
+      const c = Math.round((d.confidence || 0) * 100);
+      $('confText').textContent = c + '%'; $('confSub').textContent = 'sure';
+      $('votes').innerHTML = d.votes.map((v) => `<span class="${v === name ? 'match' : ''}" style="${v === name ? 'background:' + surfColor(v) : ''}" title="${v}">${(v[0] || '?').toUpperCase()}</span>`).join('');
+      $('surfNote').hidden = true;
+    } else {
+      $('confText').textContent = '–'; $('confSub').textContent = '';
+      $('votes').innerHTML = '';
+      $('surfNote').hidden = false;
+      $('surfNote').textContent = d.nucleo ? 'The surface appears here once the NanoEdge model runs on the Nucleo.'
+        : 'No data from the Nucleo. Check that the bridge is running and the board is plugged in.';
+    }
+    const now = Date.now();
+    const h = S.history, lastH = h[h.length - 1];
+    if (!lastH || lastH.s !== (name || null) || now - lastH.t > 1000) h.push({ t: now, s: name || null, c: d.confidence });
+    while (h.length && h[0].t < now - 130000) h.shift();
+  }
+
+  function events(list) {
+    if (!list.length) return;
+    const ul = $('events');
+    for (const [, time, name] of list) {
+      S.marks.push({ t: Date.now(), name });
+      const li = document.createElement('li');
+      if (SERIOUS.has(name)) li.className = 'serious';
+      li.innerHTML = '<time></time><span></span>';
+      li.firstChild.textContent = time;
+      li.lastChild.textContent = EVENT_TEXT[name] || cap(name) + '.';
+      ul.prepend(li);
+    }
+    while (ul.children.length > 50) ul.lastChild.remove();
+    while (S.marks.length && S.marks[0].t < Date.now() - 130000) S.marks.shift();
+    $('eventsEmpty').hidden = ul.children.length > 0;
+  }
+
+  function health(d) {
+    const L = d.link || {}, rates = L.rates || {};
+    const has = d.nucleo && L.receiving;
+    setKV('hImu', has ? `${fmt(rates.imu || 0, 1)} per s` : '–', has && rates.imu > 5 ? 'ok' : '');
+    setKV('hHb', has ? `${fmt(rates.heartbeat || 0, 1)} per s` : '–');
+    setKV('hCrc', L.crc_errors != null ? String(L.crc_errors) : '–', L.crc_errors > 0 ? 'warn' : '');
+    setKV('hLost', L.lost != null ? String(L.lost) : '–', L.lost > 0 ? 'warn' : '');
+    setKV('hBias', S.biasSeen ? S.bias.map((b) => fmt(b, 1)).join(', ') + ' °/s' : 'learning, keep still');
+    setKV('hNoise', S.noise != null ? `${fmt(S.noise * 1000, 1)} mg` : '–');
+    const P = d.pi || {};
+    setKV('hTemp', P.temp_c != null ? `${fmt(P.temp_c, 1)} °C` : '–', P.temp_c >= 80 ? 'bad' : P.temp_c >= 70 ? 'warn' : P.temp_c != null ? 'ok' : '');
+    setKV('hLoad', P.load != null ? `${fmt(P.load, 2)} of ${P.cores || 4} cores` : '–', P.load > (P.cores || 4) * 0.8 ? 'warn' : '');
+    setKV('hMem', P.mem_pct != null ? `${fmt(P.mem_pct, 0)} %` : '–', P.mem_pct > 85 ? 'warn' : '');
+    setKV('hDisk', P.disk_free_gb != null ? `${fmt(P.disk_free_gb, 1)} GB` : '–', P.disk_free_gb != null && P.disk_free_gb < 2 ? 'warn' : '');
+  }
+
+  // ---------- recording ----------
+  function recordForm() {
+    const s = S.surface === 'other' ? $('otherName').value.trim() : S.surface;
+    return { surface: s, power: +$('pwr').value, duration: +$('dur').value, drive: $('driveRec').checked };
+  }
+  function plan() {
+    const cfg = (S.data && S.data.config) || { max_speed: 0.2, settle_s: 1 };
+    const f = recordForm();
+    $('pwrOut').textContent = f.power + ' %';
+    $('plan').textContent = f.drive
+      ? `The robot drives straight for about ${(f.power / 100 * cfg.max_speed * (f.duration + cfg.settle_s)).toFixed(1)} m. Clear the path first.`
+      : 'The wheels stay still. Move the robot by hand or record it standing.';
+  }
+  function blocker(d) {
+    if (!d || !d.nucleo) return 'Connect the Nucleo first.';
+    if (d.imu_rate <= 5) return 'No sensor data yet. Check the MPU and the firmware.';
+    if (d.flags.includes('safety_stop')) return 'Safety stop is on. Press Stop to clear it.';
+    const f = recordForm();
+    if (!f.surface) return 'Type a name for the surface.';
+    if (!(f.duration >= 2 && f.duration <= 60)) return 'Duration must be 2 to 60 seconds.';
+    return '';
+  }
+  function record(d) {
+    const btn = $('recBtn');
+    if (d.rec) {
+      const r = d.rec;
+      btn.textContent = 'Stop recording'; btn.classList.add('recording'); btn.disabled = false;
+      $('recWhy').textContent = ''; $('recLive').hidden = false; $('recResult').hidden = true;
+      if (r.phase === 'settle') { $('recFill').style.width = '0%'; $('recLine').textContent = 'Getting up to speed before recording starts.'; }
+      else {
+        const t = Math.min(r.elapsed, r.duration);
+        $('recFill').style.width = (100 * t / r.duration).toFixed(1) + '%';
+        $('recLine').textContent = `Recording ${r.surface} at ${r.power} %: ${t.toFixed(1)} of ${r.duration} s, ${r.samples} samples. Motion: ${S.motion || '–'}.`;
+      }
+      return;
+    }
+    btn.textContent = 'Start recording'; btn.classList.remove('recording'); $('recLive').hidden = true;
+    const why = blocker(d); btn.disabled = !!why; $('recWhy').textContent = why;
+    const res = $('recResult');
+    if (d.last_rec) {
+      const L = d.last_rec;
+      res.hidden = false; res.className = 'result' + (L.complete ? '' : ' partial');
+      res.textContent = L.complete ? `Saved ${L.name}: ${L.samples} samples.`
+        : `Stopped early (${L.reason}).` + (L.name ? ` Kept ${L.samples} samples in ${L.name}.` : ' Nothing was saved.');
+    } else res.hidden = true;
+  }
+  $('surfSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    S.surface = b.dataset.s;
+    for (const x of $('surfSeg').children) x.setAttribute('aria-pressed', String(x === b));
+    $('otherName').hidden = S.surface !== 'other';
+    if (S.surface === 'other') $('otherName').focus();
+    plan(); if (S.data) record(S.data);
+  });
+  for (const id of ['pwr', 'dur', 'driveRec', 'otherName']) $(id).addEventListener('input', () => { plan(); if (S.data) record(S.data); });
+  $('recBtn').addEventListener('click', () => {
+    if (S.data && S.data.rec) post('/api/record/stop'); else post('/api/record/start', recordForm());
+  });
+
+  // ---------- driving: stick and keys ----------
+  const speed = () => +$('spd').value / 100;
+  const drive = { lin: 0, ang: 0, active: false, timer: 0 };
+  const keys = new Set();
+  const KEYS = { ArrowUp: 'f', KeyW: 'f', ArrowDown: 'b', KeyS: 'b', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r' };
+  function setDrive(lin, ang) {
+    const was = drive.active;
+    drive.lin = lin; drive.ang = ang; drive.active = lin !== 0 || ang !== 0;
+    clearInterval(drive.timer);
+    if (drive.active) {
+      post('/api/drive', { lin, ang, speed: speed() });
+      drive.timer = setInterval(() => post('/api/drive', { lin: drive.lin, ang: drive.ang, speed: speed() }), 100);
+    } else if (was) post('/api/drive', { lin: 0, ang: 0, speed: speed() });
+  }
+  const stick = $('stick'), knob = $('knob');
+  function stickMove(e) {
+    const r = stick.getBoundingClientRect(), R = r.width / 2 - 34;
+    let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const len = Math.hypot(dx, dy); if (len > R) { dx *= R / len; dy *= R / len; }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    const lin = -dy / R, ang = -dx / R;
+    drive.lin = Math.abs(lin) < 0.08 ? 0 : +lin.toFixed(2);
+    drive.ang = Math.abs(ang) < 0.08 ? 0 : +ang.toFixed(2);
+  }
+  stick.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); stick.setPointerCapture(e.pointerId); stick.classList.add('active');
+    stickMove(e);
+    keys.clear(); clearInterval(drive.timer); drive.active = true;
+    const send = () => post('/api/drive', { lin: drive.lin, ang: drive.ang, speed: speed() });
+    send(); drive.timer = setInterval(send, 100);
+  });
+  stick.addEventListener('pointermove', (e) => { if (stick.classList.contains('active')) stickMove(e); });
+  function stickRelease() {
+    if (!stick.classList.contains('active')) return;
+    stick.classList.remove('active'); knob.style.transform = '';
+    setDrive(0, 0);
+  }
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) stick.addEventListener(ev, stickRelease);
+  function keyVector() {
+    setDrive((keys.has('f') ? 1 : 0) - (keys.has('b') ? 1 : 0), (keys.has('l') ? 1 : 0) - (keys.has('r') ? 1 : 0));
+  }
+  const typing = (e) => e.target.matches('input[type="text"], input:not([type]), input[type="number"], select');
+  window.addEventListener('keydown', (e) => {
+    if (typing(e)) return;
+    if (e.code === 'Space') { e.preventDefault(); stopAll(); return; }
+    const k = KEYS[e.code]; if (k) { e.preventDefault(); if (!keys.has(k)) { keys.add(k); keyVector(); } }
+  });
+  window.addEventListener('keyup', (e) => { const k = KEYS[e.code]; if (k && keys.delete(k)) keyVector(); });
+  function releaseAll() { keys.clear(); stickRelease(); if (drive.active) setDrive(0, 0); }
+  window.addEventListener('blur', releaseAll);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
+  $('spd').addEventListener('input', () => {
+    const cfg = (S.data && S.data.config) || { max_speed: 0.2 };
+    $('spdOut').textContent = `${$('spd').value} %, ${(speed() * cfg.max_speed).toFixed(2)} m/s`;
+  });
+  function stopAll() { keys.clear(); stick.classList.remove('active'); knob.style.transform = ''; drive.active = false; clearInterval(drive.timer); post('/api/stop'); }
+  $('stop').addEventListener('click', stopAll);
+
+  // ---------- drawing: live view ----------
+  function sizeCanvas(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w: cv.clientWidth, h: cv.clientHeight };
+  }
+  function grid(ctx, w, h, x, tStart, tEnd, y0) {
+    ctx.strokeStyle = css('--iron'); ctx.lineWidth = 1; ctx.beginPath();
+    for (let s = Math.ceil(tStart); s <= tEnd; s++) { const px = Math.round(x(s)) + 0.5; ctx.moveTo(px, 0); ctx.lineTo(px, h); }
+    if (y0 != null) { const py = Math.round(y0) + 0.5; ctx.moveTo(0, py); ctx.lineTo(w, py); }
+    ctx.stroke();
+  }
+  function plotRows(cv, rows, tStart, tEnd, series, opts) {
+    const { ctx, w, h } = sizeCanvas(cv);
+    ctx.clearRect(0, 0, w, h);
+    let lo = Infinity, hi = -Infinity;
+    for (const r of rows) for (const s of series) { const v = s.get(r); if (v < lo) lo = v; if (v > hi) hi = v; }
+    if (!rows.length) { lo = -opts.minSpan; hi = opts.minSpan; }
+    if (opts.symmetric) { const m = Math.max(Math.abs(lo), Math.abs(hi), opts.minSpan); lo = -m; hi = m; }
+    else if (hi - lo < opts.minSpan * 2) { const mid = (hi + lo) / 2; lo = mid - opts.minSpan; hi = mid + opts.minSpan; }
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    const x = (t) => (t - tStart) / (tEnd - tStart) * w, y = (v) => h - (v - lo) / (hi - lo) * h;
+    grid(ctx, w, h, x, tStart, tEnd, lo < 0 && hi > 0 ? y(0) : null);
+    ctx.fillStyle = css('--ash'); ctx.font = '11px ' + css('--text');
+    ctx.fillText(fmt(hi, opts.digits), 5, 12); ctx.fillText(fmt(lo, opts.digits), 5, h - 5);
+    ctx.lineJoin = 'round';
+    for (const s of series) {
+      ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 1.3; ctx.beginPath();
+      rows.forEach((r, k) => { const px = x(r[0]), py = y(s.get(r)); if (k) ctx.lineTo(px, py); else ctx.moveTo(px, py); });
+      ctx.stroke();
+    }
+  }
+  function drawSpectrogram(cv, cols, tStart, tEnd) {
+    const { ctx, w, h } = sizeCanvas(cv);
+    ctx.fillStyle = '#100C12'; ctx.fillRect(0, 0, w, h);
+    if (!cols.length) return null;
+    const bins = cols[0].p.length;
+    let maxDb = -Infinity;
+    const db = cols.map((c) => c.p.map((p) => { const v = 10 * Math.log10(p + 1e-9); if (v > maxDb) maxDb = v; return v; }));
+    const floor = maxDb - 45, colW = Math.max(1, w / (WINDOW_S * 10));
+    cols.forEach((c, i) => {
+      const x0 = (c.t - tStart) / (tEnd - tStart) * w;
+      for (let k = 0; k < bins; k++) {
+        const f = Math.min(1, Math.max(0, (db[i][k] - floor) / 45));
+        const [r, g, b] = LUT[Math.round(f * 255)];
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        const y1 = h - (k + 1) / bins * h;
+        ctx.fillRect(x0 - colW, y1, colW + 0.5, h / bins + 0.5);
+      }
+    });
+    ctx.fillStyle = 'rgba(234,224,207,.6)'; ctx.font = '11px ' + css('--text');
+    const nyq = S.data && S.data.imu_rate > 5 ? S.data.imu_rate / 2 : 50;
+    for (const f of [10, 20, 30, 40]) if (f < nyq) ctx.fillText(f + ' Hz', 5, h - f / nyq * h + 4);
+    // dominant frequency: average of the last few columns, ignoring the lowest bin
+    const recent = cols.slice(-5), avg = recent[0].p.map((_, k) => recent.reduce((a, c) => a + c.p[k], 0) / recent.length);
+    let best = 1; for (let k = 1; k < avg.length; k++) if (avg[k] > avg[best]) best = k;
+    return (best + 1) * nyq / bins;
+  }
+  function drawTimeline() {
+    const cv = $('timeline'); const { ctx, w, h } = sizeCanvas(cv);
+    ctx.clearRect(0, 0, w, h);
+    const now = Date.now(), t0 = now - 120000, x = (t) => (t - t0) / 120000 * w;
+    const band = h - 22;
+    ctx.fillStyle = '#100C12'; ctx.fillRect(0, 8, w, band);
+    const H = S.history;
+    for (let i = 0; i < H.length; i++) {
+      const a = Math.max(H[i].t, t0), b = i + 1 < H.length ? H[i + 1].t : now;
+      if (b < t0 || !H[i].s) continue;
+      ctx.fillStyle = surfColor(H[i].s); ctx.globalAlpha = 0.35 + 0.65 * (H[i].c || 0);
+      ctx.fillRect(x(a), 8, Math.max(1, x(b) - x(a)), band);
+    }
+    ctx.globalAlpha = 1;
+    for (const m of S.marks) {
+      if (m.t < t0) continue;
+      const px = x(m.t);
+      ctx.fillStyle = SERIOUS.has(m.name) ? '#E04A64' : css('--gild');
+      ctx.beginPath(); ctx.moveTo(px, 2); ctx.lineTo(px + 5, 8); ctx.lineTo(px, 14); ctx.lineTo(px - 5, 8); ctx.fill();
+      ctx.fillRect(px - 0.5, 8, 1, band);
+    }
+    ctx.fillStyle = css('--ash'); ctx.font = '11px ' + css('--text');
+    ctx.fillText('2 min ago', 2, h - 4); const lbl = 'now'; ctx.fillText(lbl, w - ctx.measureText(lbl).width - 2, h - 4);
+    if (!H.some((p) => p.s)) { ctx.fillStyle = css('--ash'); ctx.font = '13px ' + css('--text'); ctx.fillText('No surface readings yet', 10, 8 + band / 2 + 4); }
+  }
+  function drawRose() {
+    const A = S.att, fresh = S.data && S.data.imu_rate > 5 && A.init;
+    const roll = fresh ? A.roll : 0, pitch = fresh ? A.pitch : 0;
+    const off = Math.max(-70, Math.min(70, pitch * 2));
+    $('horizon').setAttribute('transform', `rotate(${-roll}) translate(0 ${off})`);
+    $('rollPointer').setAttribute('transform', `rotate(${-roll})`);
+    $('rollOut').textContent = fresh ? fmt(roll, 1) + '°' : '–';
+    $('pitchOut').textContent = fresh ? fmt(pitch, 1) + '°' : '–';
+    $('gOut').textContent = fresh && S.gTotal ? fmt(S.gTotal, 2) : '–';
+  }
+  function legend(id, row, from, digits) {
+    $(id).querySelectorAll('b').forEach((b, i) => { b.textContent = row ? fmt(row[from + i], digits) : '–'; });
+  }
+  function drawLive() {
+    const fresh = S.data && S.data.imu_rate > 5;
+    document.querySelectorAll('[data-needs-imu]').forEach((e) => { e.hidden = !!fresh; });
+    const tEnd = S.lastT, tStart = tEnd - WINDOW_S, rows = S.imu.filter((r) => r[0] >= tStart);
+    plotRows($('seis'), rows, tStart, tEnd, [{ get: (r) => mag(r) - 1, color: css('--bone'), width: 1.1 }], { minSpan: 0.05, symmetric: true, digits: 2 });
+    const [sx, sy, sz] = [css('--sx'), css('--sy'), css('--sz')];
+    plotRows($('acc'), rows, tStart, tEnd, [1, 2, 3].map((c, i) => ({ get: (r) => r[c], color: [sx, sy, sz][i] })), { minSpan: 0.25, digits: 2 });
+    plotRows($('gyr'), rows, tStart, tEnd, [4, 5, 6].map((c, i) => ({ get: (r) => r[c], color: [sx, sy, sz][i] })), { minSpan: 20, digits: 0 });
+    const dom = drawSpectrogram($('spec'), S.spec, tStart, tEnd);
+    $('nyq').textContent = fresh ? Math.round(S.data.imu_rate / 2) : 50;
+    $('domFreq').textContent = fresh && dom ? `strongest ${fmt(dom, 1)} Hz` : '';
+    $('vibText').textContent = fresh && S.vibSd != null ? `RMS ${fmt(S.vibSd * 1000, 1)} mg` : '';
+    $('vibMeta').textContent = S.data && S.data.vibration != null ? `classifier window ${fmt(S.data.vibration, 3)} g` : '';
+    const last = fresh ? S.imu[S.imu.length - 1] : null;
+    legend('accLegend', last, 1, 2); legend('gyrLegend', last, 4, 1);
+    drawRose(); drawTimeline();
+  }
+  function frame() {
+    if (S.dirty && !$('live').hidden) { S.dirty = false; drawLive(); }
+    requestAnimationFrame(frame);
+  }
+  window.addEventListener('resize', () => { S.dirty = true; if (!$('data').hidden && S.ins) drawInspector(); });
+
+  // rose window tracery: ticks every 15 degrees, twelve foils
+  (() => {
+    let t = '', f = '';
+    for (let a = 0; a < 360; a += 15) {
+      const r1 = a % 45 === 0 ? 84 : 87, rad = a * Math.PI / 180;
+      t += `<line x1="${(r1 * Math.sin(rad)).toFixed(1)}" y1="${(-r1 * Math.cos(rad)).toFixed(1)}" x2="${(97 * Math.sin(rad)).toFixed(1)}" y2="${(-97 * Math.cos(rad)).toFixed(1)}"/>`;
+    }
+    for (let a = 15; a < 360; a += 30) { const rad = a * Math.PI / 180; f += `<circle cx="${(103 * Math.sin(rad)).toFixed(1)}" cy="${(-103 * Math.cos(rad)).toFixed(1)}" r="5"/>`; }
+    $('ticks').innerHTML = t; $('foils').innerHTML = f;
+    let l = '';
+    for (let p = -30; p <= 30; p += 10) if (p) l += `<line x1="${p % 20 ? -12 : -22}" x2="${p % 20 ? 12 : 22}" y1="${-p * 2}" y2="${-p * 2}"/>`;
+    $('ladder').innerHTML = l;
+  })();
+
+  // ---------- tabs ----------
+  function showTab(which) {
+    const live = which === 'live';
+    $('live').hidden = !live; $('data').hidden = live;
+    $('tabLive').setAttribute('aria-selected', String(live)); $('tabData').setAttribute('aria-selected', String(!live));
+    if (live) S.dirty = true; else { renderData(); refreshExport(); }
+  }
+  $('tabLive').addEventListener('click', () => showTab('live'));
+  $('tabData').addEventListener('click', () => showTab('data'));
+
+  // ---------- data view ----------
+  async function loadFiles() {
+    try {
+      const j = await (await fetch('/api/files')).json();
+      S.files = j.files; S.folder = j.folder;
+      if (!$('data').hidden) { renderData(); refreshExport(); }
+    } catch (e) { /* the stream banner reports connection problems */ }
+  }
+  function renderData() {
+    const files = S.files || [];
+    const surfaces = ['tile', 'carpet', 'grass'];
+    for (const f of files) if (!surfaces.includes(f.surface)) surfaces.push(f.surface);
+    const powers = [...new Set([40, 60, 80, ...files.map((f) => f.power_pct)])].sort((a, b) => a - b);
+    const goal = Math.max(1, +$('goal').value || 60);
+    const cell = {};
+    for (const f of files) if (f.complete) {
+      const k = f.surface + '|' + f.power_pct; const c = cell[k] || (cell[k] = { s: 0, n: 0 });
+      c.s += f.duration_s || 0; c.n += 1;
+    }
+    let html = '<tr><th>Surface</th>' + powers.map((p) => `<th>${p} %</th>`).join('') + '</tr>';
+    for (const s of surfaces) {
+      html += `<tr><th><span class="rowname"><i style="background:${surfColor(s)}"></i>${NAMES[s] || cap(s)}</span></th>`;
+      for (const p of powers) {
+        const c = cell[s + '|' + p] || { s: 0, n: 0 }, frac = Math.min(1, c.s / goal);
+        const sel = S.filter && S.filter.s === s && S.filter.p === p;
+        html += `<td><button data-s="${s}" data-p="${p}" aria-pressed="${sel}" title="${c.n} runs" style="--c:${surfColor(s)}"><span class="fill" style="width:${(frac * 100).toFixed(0)}%"></span><span class="lbl">${Math.round(c.s)} s</span></button></td>`;
+      }
+      html += '</tr>';
+    }
+    $('coverage').innerHTML = html;
+    const list = files.filter((f) => !S.filter || (f.surface === S.filter.s && f.power_pct === S.filter.p));
+    $('libCount').textContent = S.filter ? `${list.length} of ${files.length} recordings: ${NAMES[S.filter.s] || cap(S.filter.s)} at ${S.filter.p} %` : `${files.length} recordings`;
+    $('clearFilter').hidden = !S.filter;
+    const ul = $('lib'); ul.textContent = '';
+    for (const f of list) {
+      const li = document.createElement('li');
+      if (S.ins && S.ins.file === f.file) li.className = 'sel';
+      li.innerHTML = '<span class="fname"></span><span class="acts"><button class="btn small" data-act="ins">Inspect</button><a data-act="dl">Download</a><button class="btn small danger" data-act="del">Delete</button></span><span class="meta"></span>';
+      li.querySelector('.fname').textContent = f.file;
+      const a = li.querySelector('a'); a.href = '/data/' + encodeURIComponent(f.file); a.setAttribute('download', f.file);
+      const m = li.querySelector('.meta');
+      m.textContent = `${f.samples} samples, ${f.duration_s} s at ${f.rate_hz} Hz, ${f.power_pct} %, ${f.drive ? 'driving' : 'standing'}` + (f.complete ? '' : `, stopped early: ${f.reason}`);
+      if (!f.complete) m.classList.add('partial');
+      li.dataset.file = f.file;
+      ul.append(li);
+    }
+    $('libFolder').textContent = files.length ? `Saved on the Pi in ${S.folder}` : 'No recordings yet. Use Record on the Live view.';
+  }
+  $('coverage').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const s = b.dataset.s, p = +b.dataset.p;
+    S.filter = S.filter && S.filter.s === s && S.filter.p === p ? null : { s, p };
+    renderData();
+  });
+  $('clearFilter').addEventListener('click', () => { S.filter = null; renderData(); });
+  $('goal').addEventListener('input', renderData);
+  $('lib').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const file = b.closest('li').dataset.file;
+    if (b.dataset.act === 'ins') inspect(file);
+    if (b.dataset.act === 'del') {
+      if (!b.classList.contains('armed')) {
+        b.classList.add('armed'); b.textContent = 'Confirm';
+        setTimeout(() => { b.classList.remove('armed'); b.textContent = 'Delete'; }, 3000);
+        return;
+      }
+      if (await post('/api/delete', { file })) { toast(`Deleted ${file}`); if (S.ins && S.ins.file === file) { S.ins = null; $('insBody').hidden = true; $('insEmpty').hidden = false; $('insName').textContent = ''; } }
+    }
+  });
+
+  async function inspect(file) {
+    try {
+      const text = await (await fetch('/data/' + encodeURIComponent(file))).text();
+      const lines = text.trim().split('\n'); lines.shift();
+      const rows = lines.map((l) => l.split(',').map(Number)).filter((r) => r.length === 7 && r.every(Number.isFinite));
+      if (rows.length < 10) { toast('That recording has too few samples to inspect.'); return; }
+      S.ins = { file, rows };
+      $('insName').textContent = file; $('insEmpty').hidden = true; $('insBody').hidden = false;
+      renderData(); drawInspector();
+    } catch (e) { toast('Could not read that recording.'); }
+  }
+  function drawInspector() {
+    const { rows } = S.ins, n = rows.length;
+    const dur = rows[n - 1][0] - rows[0][0], rate = (n - 1) / dur;
+    let gaps = 0; for (let i = 1; i < n; i++) if (rows[i][0] - rows[i - 1][0] > 1.5 / rate) gaps++;
+    const names = ['Accel x', 'Accel y', 'Accel z', 'Gyro x', 'Gyro y', 'Gyro z'];
+    let html = '<tr><th></th><th>Mean</th><th>Spread</th><th>Min</th><th>Max</th></tr>';
+    for (let c = 1; c <= 6; c++) {
+      const v = rows.map((r) => r[c]), mean = v.reduce((a, b) => a + b, 0) / n;
+      const sd = Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / n), d = c <= 3 ? 3 : 1;
+      html += `<tr><td>${names[c - 1]}${c <= 3 ? ', g' : ', °/s'}</td><td>${fmt(mean, d)}</td><td>${fmt(sd, d)}</td><td>${fmt(Math.min(...v), d)}</td><td>${fmt(Math.max(...v), d)}</td></tr>`;
+    }
+    $('insStats').innerHTML = html;
+    const m = rows.map(mag), mm = m.reduce((a, b) => a + b, 0) / n;
+    const vib = Math.sqrt(m.reduce((a, b) => a + (b - mm) ** 2, 0) / n);
+    const notes = [`${n} samples over ${fmt(dur, 2)} s, ${fmt(rate, 1)} Hz.`, `Vibration RMS ${fmt(vib * 1000, 1)} mg.`];
+    notes.push(gaps ? `${gaps} gaps in the sample stream: check the link before training on this run.` : 'No gaps in the sample stream.');
+    $('insVerdict').textContent = notes.join(' ');
+    $('insVerdict').className = 'hint' + (gaps ? ' warn-text' : '');
+    // trace, decimated to the canvas width
+    const t0 = rows[0][0];
+    const step = Math.max(1, Math.floor(n / 1200));
+    const dec = rows.filter((_, i) => i % step === 0).map((r) => [r[0] - t0, ...r.slice(1)]);
+    plotRows($('insTrace'), dec, 0, dur, [{ get: (r) => mag(r) - 1, color: css('--bone'), width: 1 }], { minSpan: 0.05, symmetric: true, digits: 2 });
+    // Welch-style average spectrum
+    const segs = []; for (let i = 0; i + FFT_N <= n; i += FFT_N / 2) segs.push(spectrum(m.slice(i, i + FFT_N)));
+    const cv = $('insSpec'); const { ctx, w, h } = sizeCanvas(cv);
+    ctx.clearRect(0, 0, w, h);
+    if (!segs.length) { $('insDom').textContent = ''; return; }
+    const avg = segs[0].map((_, k) => segs.reduce((a, s) => a + s[k], 0) / segs.length);
+    const db = avg.map((p) => 10 * Math.log10(p + 1e-9)), top = Math.max(...db), floor = top - 45;
+    const nyq = rate / 2, bw = w / avg.length;
+    let best = 1; for (let k = 1; k < avg.length; k++) if (avg[k] > avg[best]) best = k;
+    avg.forEach((_, k) => {
+      const f = Math.max(0, (db[k] - floor) / 45), [r, g, b] = LUT[Math.round(Math.min(1, f) * 255)];
+      ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.fillRect(k * bw + 1, h - f * (h - 16), bw - 2, f * (h - 16));
+    });
+    ctx.fillStyle = css('--ash'); ctx.font = '11px ' + css('--text');
+    for (const f of [0, 10, 20, 30, 40, 50]) if (f <= nyq) ctx.fillText(f + ' Hz', Math.min(w - 30, f / nyq * w), 11);
+    $('insDom').textContent = `strongest ${fmt((best + 1) * nyq / avg.length, 1)} Hz`;
+  }
+
+  // ---------- export ----------
+  function exportParams() {
+    const win = +$('expWin').value;
+    const axes = document.querySelector('input[name="axes"]:checked').value;
+    const hop = Math.max(1, Math.round(win * +document.querySelector('input[name="hop"]:checked').value));
+    return new URLSearchParams({ window: win, hop, axes, partial: $('expPartial').checked ? '1' : '0' });
+  }
+  let expSeq = 0;
+  async function refreshExport() {
+    const seq = ++expSeq, p = exportParams(); p.set('dry', '1');
+    try {
+      const j = await (await fetch('/api/export?' + p)).json();
+      if (seq !== expSeq) return;
+      const cls = j.classes || {}, keys = Object.keys(cls);
+      let html = '';
+      if (j.error) html = `<p class="warn-text">${j.error}</p>`;
+      else {
+        const secs = j.rate_hz ? (j.window / j.rate_hz).toFixed(2) : '?';
+        html = `<p>Each window is ${secs} s of data at about ${j.rate_hz} Hz.</p><ul>` + keys.map((k) => `<li><span>${NAMES[k] || cap(k)}</span><span class="num">${cls[k]} windows</span></li>`).join('') + '</ul>';
+        const counts = keys.map((k) => cls[k]);
+        if (keys.length < 2) html += '<p class="warn-text">NanoEdge needs at least two surfaces to train a classifier.</p>';
+        else if (Math.max(...counts) > 2 * Math.min(...counts)) html += '<p class="warn-text">The classes are unbalanced. Record more of the smaller ones.</p>';
+        if (j.rate_hz && j.rate_hz < 500) html += '<p class="dim">This data is at the streaming rate. The classifier on the Nucleo will run at 1 kHz, so retrain on 1 kHz data before deploying.</p>';
+      }
+      $('expSum').innerHTML = html;
+      $('expBtn').disabled = !!j.error;
+    } catch (e) { $('expSum').textContent = 'Could not reach the Pi.'; }
+  }
+  for (const el of ['expWin', 'expPartial']) $(el).addEventListener('change', refreshExport);
+  for (const el of document.querySelectorAll('input[name="axes"], input[name="hop"]')) el.addEventListener('change', refreshExport);
+  $('expBtn').addEventListener('click', async () => {
+    try {
+      const r = await fetch('/api/export?' + exportParams());
+      if (!r.ok) { const j = await r.json(); toast(j.error || 'Export failed.'); return; }
+      const blob = await r.blob(), url = URL.createObjectURL(blob);
+      const name = (r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+      const a = document.createElement('a'); a.href = url; a.download = name ? name[1] : 'floorsense_nanoedge.zip';
+      document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) { toast('Export failed. Check the connection to the Pi.'); }
+  });
+
+  $('spd').dispatchEvent(new Event('input'));
+  plan(); connect(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
